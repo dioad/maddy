@@ -22,3 +22,5 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package imapsql
 
 import _ "github.com/mattn/go-sqlite3"
+
+const sqliteImpl = "cgo"
