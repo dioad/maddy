@@ -284,7 +284,7 @@ func ensureDirectoryWritable(path string) error {
 		return err
 	}
 	testFile.Close()
-	return os.Remove(testFile.Name())
+	return os.RemoveAll(testFile.Name())
 }
 
 func ReadGlobals(cfg []config.Node) (map[string]interface{}, []config.Node, error) {
@@ -385,7 +385,6 @@ func RegisterModules(globals map[string]interface{}, nodes []config.Node) (endpo
 			return nil, nil, err
 		}
 
-		block := block
 		module.RegisterInstance(inst, config.NewMap(globals, block))
 		for _, alias := range modAliases {
 			if module.HasInstance(alias) {
