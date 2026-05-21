@@ -34,10 +34,12 @@ import (
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
 	modconfig "github.com/foxcpp/maddy/framework/config/module"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/dns"
 	"github.com/foxcpp/maddy/framework/exterrors"
 	"github.com/foxcpp/maddy/framework/log"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 	maddydmarc "github.com/foxcpp/maddy/internal/dmarc"
 	"github.com/foxcpp/maddy/internal/target"
 	"golang.org/x/net/idna"
@@ -56,14 +58,14 @@ type Check struct {
 	permerrAction  modconfig.FailAction
 	temperrAction  modconfig.FailAction
 
-	log      log.Logger
+	log      *log.Logger
 	resolver dns.Resolver
 }
 
-func New(_, instName string, _, _ []string) (module.Module, error) {
+func New(c *container.C, _, instName string) (module.Module, error) {
 	return &Check{
 		instName: instName,
-		log:      log.Logger{Name: modName},
+		log:      c.DefaultLogger.Sublogger(modName),
 		resolver: dns.DefaultResolver(),
 	}, nil
 }
@@ -76,7 +78,7 @@ func (c *Check) InstanceName() string {
 	return c.instName
 }
 
-func (c *Check) Init(cfg *config.Map) error {
+func (c *Check) Configure(inlineArgs []string, cfg *config.Map) error {
 	cfg.Bool("debug", true, false, &c.log.Debug)
 	cfg.Bool("enforce_early", true, false, &c.enforceEarly)
 	cfg.Custom("none_action", false, false,
@@ -120,7 +122,7 @@ type state struct {
 	c        *Check
 	msgMeta  *module.MsgMetadata
 	spfFetch chan spfRes
-	log      log.Logger
+	log      *log.Logger
 
 	skip bool
 }
@@ -416,5 +418,5 @@ func (s *state) Close() error {
 }
 
 func init() {
-	module.Register(modName, New)
+	modules.Register(modName, New)
 }

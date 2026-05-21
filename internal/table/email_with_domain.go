@@ -24,27 +24,30 @@ import (
 
 	"github.com/foxcpp/maddy/framework/address"
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/log"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 )
 
 type EmailWithDomain struct {
 	modName  string
 	instName string
 	domains  []string
-	log      log.Logger
+	log      *log.Logger
 }
 
-func NewEmailWithDomain(modName, instName string, _, inlineArgs []string) (module.Module, error) {
+func NewEmailWithDomain(c *container.C, modName, instName string) (module.Module, error) {
 	return &EmailWithDomain{
 		modName:  modName,
 		instName: instName,
-		domains:  inlineArgs,
-		log:      log.Logger{Name: modName},
+		log:      c.DefaultLogger.Sublogger(modName),
 	}, nil
 }
 
-func (s *EmailWithDomain) Init(cfg *config.Map) error {
+func (s *EmailWithDomain) Configure(inlineArgs []string, cfg *config.Map) error {
+	s.domains = inlineArgs
+
 	for _, d := range s.domains {
 		if !address.ValidDomain(d) {
 			return fmt.Errorf("%s: invalid domain: %s", s.modName, d)
@@ -85,5 +88,5 @@ func (s *EmailWithDomain) LookupMulti(ctx context.Context, key string) ([]string
 }
 
 func init() {
-	module.Register("table.email_with_domain", NewEmailWithDomain)
+	modules.Register("table.email_with_domain", NewEmailWithDomain)
 }

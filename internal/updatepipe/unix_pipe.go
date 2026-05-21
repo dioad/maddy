@@ -27,6 +27,7 @@ import (
 
 	mess "github.com/foxcpp/go-imap-mess"
 	"github.com/foxcpp/maddy/framework/log"
+	"github.com/foxcpp/maddy/framework/resource/netresource"
 )
 
 // UnixSockPipe implements the UpdatePipe interface by serializating updates
@@ -44,7 +45,7 @@ import (
 // is initialized on the first call to Listen or (Init)Push.
 type UnixSockPipe struct {
 	SockPath string
-	Log      log.Logger
+	Log      *log.Logger
 
 	listener net.Listener
 	sender   net.Conn
@@ -74,7 +75,7 @@ func (usp *UnixSockPipe) readUpdates(conn net.Conn, updCh chan<- mess.Update) {
 }
 
 func (usp *UnixSockPipe) Listen(upd chan<- mess.Update) error {
-	l, err := net.Listen("unix", usp.SockPath)
+	l, err := netresource.Listen("unix", usp.SockPath)
 	if err != nil {
 		return err
 	}
@@ -119,11 +120,17 @@ func (usp *UnixSockPipe) Push(upd mess.Update) error {
 
 func (usp *UnixSockPipe) Close() error {
 	if usp.sender != nil {
-		usp.sender.Close()
+		if err := usp.sender.Close(); err != nil {
+			usp.Log.Error("failed to close sender socket", err)
+		}
 	}
 	if usp.listener != nil {
-		usp.listener.Close()
-		os.Remove(usp.SockPath)
+		if err := usp.listener.Close(); err != nil {
+			usp.Log.Error("failed to close listener", err)
+		}
+		if err := os.Remove(usp.SockPath); err != nil {
+			usp.Log.Error("failed to remove socket", err)
+		}
 	}
 	return nil
 }

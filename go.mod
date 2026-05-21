@@ -1,6 +1,8 @@
 module github.com/foxcpp/maddy
 
-go 1.23
+go 1.23.1
+
+toolchain go1.23.5
 
 require (
 	blitiri.com.ar/go/spf v1.5.1
@@ -15,12 +17,12 @@ require (
 	github.com/emersion/go-msgauth v0.6.8
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.21.3
-	github.com/foxcpp/go-dovecot-sasl v0.0.0-20200522223722-c4699d7a24bf
+	github.com/foxcpp/go-dovecot-sasl v0.0.0-20260303144336-f7632c6ec0ba
 	github.com/foxcpp/go-imap-backend-tests v0.0.0-20220105184719-e80aa29a5e16
 	github.com/foxcpp/go-imap-i18nlevel v0.0.0-20200208001533-d6ec88553005
 	github.com/foxcpp/go-imap-mess v0.0.0-20230108134257-b7ec3a649613
 	github.com/foxcpp/go-imap-namespace v0.0.0-20200802091432-08496dd8e0ed
-	github.com/foxcpp/go-imap-sql v0.5.1-0.20250124140007-8da5567429d5
+	github.com/foxcpp/go-imap-sql v0.5.1-0.20260412184517-b5e85e90f14d
 	github.com/foxcpp/go-mockdns v1.1.0
 	github.com/foxcpp/go-mtasts v0.0.0-20240130093538-1438da2e5932
 	github.com/go-ldap/ldap/v3 v3.4.10
@@ -34,6 +36,7 @@ require (
 	github.com/libdns/cloudflare v0.1.1
 	github.com/libdns/digitalocean v0.0.0-20230728223659-4f9064657aea
 	github.com/libdns/gandi v1.0.3
+	github.com/libdns/gcore v0.0.0-20250127070537-4a9d185c9d20
 	github.com/libdns/googleclouddns v1.1.0
 	github.com/libdns/hetzner v0.0.1
 	github.com/libdns/leaseweb v0.4.0
@@ -49,6 +52,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.84
 	github.com/netauth/netauth v0.6.2
 	github.com/prometheus/client_golang v1.20.5
+	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.5
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.32.0
@@ -64,6 +68,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/G-Core/gcore-dns-sdk-go v0.2.9 // indirect
 	github.com/aws/aws-sdk-go v1.44.40 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.33.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.29.1 // indirect
@@ -83,6 +88,7 @@ require (
 	github.com/caddyserver/zerossl v0.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/digitalocean/godo v1.134.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -101,6 +107,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/jimlambrt/gldap v0.1.14 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
@@ -118,6 +125,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect

@@ -20,6 +20,7 @@ package imapsql
 
 import (
 	"context"
+	"errors"
 	"runtime/trace"
 
 	"github.com/emersion/go-imap"
@@ -78,10 +79,11 @@ func (d *delivery) AddRcpt(ctx context.Context, rcptTo string, _ smtp.RcptOption
 	userHeader.Add("Delivered-To", accountName)
 
 	if err := d.d.AddRcpt(accountName, userHeader); err != nil {
-		if err == imapsql.ErrUserDoesntExists || err == backend.ErrNoSuchMailbox {
+		if errors.Is(err, imapsql.ErrUserDoesntExists) || errors.Is(err, backend.ErrNoSuchMailbox) {
 			return userDoesNotExist(err)
 		}
-		if _, ok := err.(imapsql.SerializationError); ok {
+		var serializationError imapsql.SerializationError
+		if errors.As(err, &serializationError) {
 			return &exterrors.SMTPError{
 				Code:         453,
 				EnhancedCode: exterrors.EnhancedCode{4, 3, 2},
@@ -106,7 +108,7 @@ func (d *delivery) Body(ctx context.Context, header textproto.Header, body buffe
 		for rcpt, rcptData := range d.addedRcpts {
 			folder, flags, err := d.store.filters.IMAPFilter(rcpt, rcptData.rcptTo, d.msgMeta, header, body)
 			if err != nil {
-				d.store.Log.Error("IMAPFilter failed", err, "rcpt", rcpt)
+				d.store.log.Error("IMAPFilter failed", err, "rcpt", rcpt)
 				continue
 			}
 			d.d.UserMailbox(rcpt, folder, flags)
@@ -115,11 +117,12 @@ func (d *delivery) Body(ctx context.Context, header textproto.Header, body buffe
 
 	if d.msgMeta.Quarantine {
 		if err := d.d.SpecialMailbox(imap.JunkAttr, d.store.junkMbox); err != nil {
-			if _, ok := err.(imapsql.SerializationError); ok {
+			var serializationError imapsql.SerializationError
+			if errors.As(err, &serializationError) {
 				return &exterrors.SMTPError{
 					Code:         453,
 					EnhancedCode: exterrors.EnhancedCode{4, 3, 2},
-					Message:      "Storage access serialiation problem, try again later",
+					Message:      "Internal server error, try again later",
 					TargetName:   "imapsql",
 					Err:          err,
 				}
@@ -131,11 +134,12 @@ func (d *delivery) Body(ctx context.Context, header textproto.Header, body buffe
 	header = header.Copy()
 	header.Add("Return-Path", "<"+target.SanitizeForHeader(d.mailFrom)+">")
 	err := d.d.BodyParsed(header, body.Len(), body)
-	if _, ok := err.(imapsql.SerializationError); ok {
+	var serializationError imapsql.SerializationError
+	if errors.As(err, &serializationError) {
 		return &exterrors.SMTPError{
 			Code:         453,
 			EnhancedCode: exterrors.EnhancedCode{4, 3, 2},
-			Message:      "Storage access serialiation problem, try again later",
+			Message:      "Internal server error, try again later",
 			TargetName:   "imapsql",
 			Err:          err,
 		}
@@ -155,8 +159,8 @@ func (d *delivery) Commit(ctx context.Context) error {
 	return d.d.Commit()
 }
 
-func (store *Storage) Start(ctx context.Context, msgMeta *module.MsgMetadata, mailFrom string) (module.Delivery, error) {
-	defer trace.StartRegion(ctx, "sql/Start").End()
+func (store *Storage) StartDelivery(ctx context.Context, msgMeta *module.MsgMetadata, mailFrom string) (module.Delivery, error) {
+	defer trace.StartRegion(ctx, "sql/StartDelivery").End()
 
 	return &delivery{
 		store:      store,

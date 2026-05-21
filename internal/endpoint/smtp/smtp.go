@@ -37,10 +37,14 @@ import (
 	"github.com/foxcpp/maddy/framework/config"
 	modconfig "github.com/foxcpp/maddy/framework/config/module"
 	tls2 "github.com/foxcpp/maddy/framework/config/tls"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/dns"
+	"github.com/foxcpp/maddy/framework/exterrors"
 	"github.com/foxcpp/maddy/framework/future"
 	"github.com/foxcpp/maddy/framework/log"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
+	"github.com/foxcpp/maddy/framework/resource/netresource"
 	"github.com/foxcpp/maddy/internal/auth"
 	"github.com/foxcpp/maddy/internal/authz"
 	"github.com/foxcpp/maddy/internal/limits"
@@ -54,6 +58,7 @@ type Endpoint struct {
 	serv          *smtp.Server
 	name          string
 	addrs         []string
+	endpoints     []config.Endpoint
 	listeners     []net.Listener
 	proxyProtocol *proxy_protocol.ProxyProtocol
 	pipeline      *msgpipeline.MsgPipeline
@@ -70,14 +75,12 @@ type Endpoint struct {
 	maxReceived         int
 	maxHeaderBytes      int64
 
-	sessionCnt atomic.Int32
-
-	authNormalize authz.NormalizeFunc
-	authMap       module.Table
+	sessionCnt      atomic.Int32
+	shutdownTimeout time.Duration
 
 	listenersWg sync.WaitGroup
 
-	Log log.Logger
+	log *log.Logger
 }
 
 func (endp *Endpoint) Name() string {
@@ -88,7 +91,8 @@ func (endp *Endpoint) InstanceName() string {
 	return endp.name
 }
 
-func New(modName string, addrs []string) (module.Module, error) {
+func New(c *container.C, modName string, addrs []string) (container.LifetimeModule, error) {
+	logger := c.DefaultLogger.Sublogger(modName)
 	endp := &Endpoint{
 		name:       modName,
 		addrs:      addrs,
@@ -96,17 +100,17 @@ func New(modName string, addrs []string) (module.Module, error) {
 		lmtp:       modName == "lmtp",
 		resolver:   dns.DefaultResolver(),
 		buffer:     buffer.BufferInMemory,
-		Log:        log.Logger{Name: modName},
+		log:        logger,
 		saslAuth: auth.SASLAuth{
-			Log: log.Logger{Name: modName + "/sasl"},
+			Log: logger.Sublogger("sasl"),
 		},
 	}
 	return endp, nil
 }
 
-func (endp *Endpoint) Init(cfg *config.Map) error {
+func (endp *Endpoint) Configure(_ []string, cfg *config.Map) error {
 	endp.serv = smtp.NewServer(endp)
-	endp.serv.ErrorLog = endp.Log
+	endp.serv.ErrorLog = endp.log
 	endp.serv.LMTP = endp.lmtp
 	endp.serv.EnableSMTPUTF8 = true
 	endp.serv.EnableREQUIRETLS = true
@@ -123,13 +127,7 @@ func (endp *Endpoint) Init(cfg *config.Map) error {
 
 		addresses = append(addresses, saddr)
 	}
-
-	if err := endp.setupListeners(addresses); err != nil {
-		for _, l := range endp.listeners {
-			l.Close()
-		}
-		return err
-	}
+	endp.endpoints = addresses
 
 	allLocal := true
 	for _, addr := range addresses {
@@ -139,11 +137,11 @@ func (endp *Endpoint) Init(cfg *config.Map) error {
 	}
 
 	if endp.serv.AllowInsecureAuth && !allLocal {
-		endp.Log.Println("authentication over unencrypted connections is allowed, this is insecure configuration and should be used only for testing!")
+		endp.log.Println("authentication over unencrypted connections is allowed, this is insecure configuration and should be used only for testing!")
 	}
 	if endp.serv.TLSConfig == nil {
 		if !allLocal {
-			endp.Log.Println("TLS is disabled, this is insecure configuration and should be used only for testing!")
+			endp.log.Println("TLS is disabled, this is insecure configuration and should be used only for testing!")
 		}
 
 		endp.serv.AllowInsecureAuth = true
@@ -255,6 +253,7 @@ func (endp *Endpoint) setConfig(cfg *config.Map) error {
 	modconfig.Table(cfg, "auth_map", true, false, nil, &endp.saslAuth.AuthMap)
 	cfg.Duration("write_timeout", false, false, 1*time.Minute, &endp.serv.WriteTimeout)
 	cfg.Duration("read_timeout", false, false, 10*time.Minute, &endp.serv.ReadTimeout)
+	cfg.Duration("shutdown_timeout", false, false, 3*time.Minute, &endp.shutdownTimeout)
 	cfg.DataSize("max_message_size", false, false, 32*1024*1024, &endp.serv.MaxMessageBytes)
 	cfg.DataSize("max_header_size", false, false, 1*1024*1024, &endp.maxHeaderBytes)
 	cfg.Int("max_recipients", false, false, 20000, &endp.serv.MaxRecipients)
@@ -272,7 +271,7 @@ func (endp *Endpoint) setConfig(cfg *config.Map) error {
 	cfg.Bool("reverse_proxy_mode", true, false, &endp.serv.ReverseProxyMode)
 	cfg.Int("smtp_max_line_length", false, false, 4000, &endp.serv.MaxLineLength)
 	cfg.Bool("io_debug", false, false, &ioDebug)
-	cfg.Bool("debug", true, false, &endp.Log.Debug)
+	cfg.Bool("debug", true, false, &endp.log.Debug)
 	cfg.Bool("defer_sender_reject", false, true, &endp.deferServerReject)
 	cfg.Int("max_logged_rcpt_errors", false, false, 5, &endp.maxLoggedRcptErrors)
 	cfg.Custom("limits", false, false, func() (interface{}, error) {
@@ -290,6 +289,9 @@ func (endp *Endpoint) setConfig(cfg *config.Map) error {
 		return err
 	}
 
+	endp.saslAuth.Log.Debug = endp.log.Debug
+	endp.saslAuth.ErrorMap = endp.authErrorMap
+
 	// INTERNATIONALIZATION: See RFC 6531 Section 3.3.
 	endp.serv.Domain, err = idna.ToASCII(hostname)
 	if err != nil {
@@ -302,7 +304,7 @@ func (endp *Endpoint) setConfig(cfg *config.Map) error {
 	}
 	endp.pipeline.Hostname = endp.serv.Domain
 	endp.pipeline.Resolver = endp.resolver
-	endp.pipeline.Log = log.Logger{Name: "smtp/pipeline", Debug: endp.Log.Debug}
+	endp.pipeline.Log = endp.log.Sublogger("pipeline")
 	endp.pipeline.FirstPipeline = true
 
 	if endp.submission {
@@ -311,26 +313,50 @@ func (endp *Endpoint) setConfig(cfg *config.Map) error {
 			return fmt.Errorf("%s: auth. provider must be set for submission endpoint", endp.name)
 		}
 	}
-	endp.saslAuth.AuthNormalize = endp.authNormalize
-	endp.saslAuth.AuthMap = endp.authMap
 
 	if ioDebug {
-		endp.serv.Debug = endp.Log.DebugWriter()
-		endp.Log.Println("I/O debugging is on! It may leak passwords in logs, be careful!")
+		endp.serv.Debug = endp.log.DebugWriter()
+		endp.log.Println("I/O debugging is on! It may leak passwords in logs, be careful!")
 	}
 
 	return nil
+}
+
+func (endp *Endpoint) Start() error {
+	if err := endp.setupListeners(endp.endpoints); err != nil {
+		if err := endp.Stop(); err != nil {
+			endp.log.Error("failed to Stop after setupListeners fail", err)
+		}
+		return err
+	}
+	return nil
+}
+
+func (endp *Endpoint) authErrorMap(err error) error {
+	if exterrors.IsTemporary(err) {
+		return &smtp.SMTPError{
+			Code:         454,
+			EnhancedCode: smtp.EnhancedCode{4, 7, 0},
+			Message:      "Temporary authentication failure",
+		}
+	}
+
+	return &smtp.SMTPError{
+		Code:         535,
+		EnhancedCode: smtp.EnhancedCode{5, 7, 8},
+		Message:      "Invalid credentials",
+	}
 }
 
 func (endp *Endpoint) setupListeners(addresses []config.Endpoint) error {
 	for _, addr := range addresses {
 		var l net.Listener
 		var err error
-		l, err = net.Listen(addr.Network(), addr.Address())
+		l, err = netresource.Listen(addr.Network(), addr.Address())
 		if err != nil {
 			return fmt.Errorf("%s: %w", endp.name, err)
 		}
-		endp.Log.Printf("listening on %v", addr)
+		endp.log.Printf("listening on %v", addr)
 
 		if addr.IsTLS() {
 			if endp.serv.TLSConfig == nil {
@@ -340,7 +366,7 @@ func (endp *Endpoint) setupListeners(addresses []config.Endpoint) error {
 		}
 
 		if endp.proxyProtocol != nil {
-			l = proxy_protocol.NewListener(l, endp.proxyProtocol, endp.Log)
+			l = proxy_protocol.NewListener(l, endp.proxyProtocol, endp.log.Sublogger("proxy"))
 		}
 
 		endp.listeners = append(endp.listeners, l)
@@ -348,7 +374,7 @@ func (endp *Endpoint) setupListeners(addresses []config.Endpoint) error {
 		endp.listenersWg.Add(1)
 		go func() {
 			if err := endp.serv.Serve(l); err != nil {
-				endp.Log.Printf("failed to serve %s: %s", addr, err)
+				endp.log.Printf("failed to serve %s: %s", addr, err)
 			}
 			endp.listenersWg.Done()
 		}()
@@ -363,7 +389,7 @@ func (endp *Endpoint) NewSession(conn *smtp.Conn) (smtp.Session, error) {
 	// Executed before authentication and session initialization.
 	if err := endp.pipeline.RunEarlyChecks(context.TODO(), &sess.connState); err != nil {
 		if err := sess.Logout(); err != nil {
-			endp.Log.Error("early checks logout failed", err)
+			endp.log.Error("early checks logout failed", err)
 		}
 		return nil, endp.wrapErr("", true, "EHLO", err)
 	}
@@ -376,7 +402,7 @@ func (endp *Endpoint) NewSession(conn *smtp.Conn) (smtp.Session, error) {
 func (endp *Endpoint) newSession(conn *smtp.Conn) *Session {
 	s := &Session{
 		endp:       endp,
-		log:        endp.Log,
+		log:        endp.log,
 		sessionCtx: context.Background(),
 	}
 
@@ -420,14 +446,21 @@ func (endp *Endpoint) ConnectionCount() int {
 	return int(endp.sessionCnt.Load())
 }
 
-func (endp *Endpoint) Close() error {
-	endp.serv.Close()
+func (endp *Endpoint) Stop() error {
+	ctx, cancel := context.WithTimeout(context.Background(), endp.shutdownTimeout)
+	defer cancel()
+
+	if err := endp.serv.Shutdown(ctx); err != nil {
+		return err
+	}
+
 	endp.listenersWg.Wait()
+
 	return nil
 }
 
 func init() {
-	module.RegisterEndpoint("smtp", New)
-	module.RegisterEndpoint("submission", New)
-	module.RegisterEndpoint("lmtp", New)
+	modules.RegisterEndpoint("smtp", New)
+	modules.RegisterEndpoint("submission", New)
+	modules.RegisterEndpoint("lmtp", New)
 }

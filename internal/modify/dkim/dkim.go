@@ -34,10 +34,12 @@ import (
 	"github.com/foxcpp/maddy/framework/address"
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/dns"
 	"github.com/foxcpp/maddy/framework/exterrors"
 	"github.com/foxcpp/maddy/framework/log"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 	"github.com/foxcpp/maddy/internal/target"
 	"golang.org/x/net/idna"
 )
@@ -108,25 +110,15 @@ type Modifier struct {
 	multipleFromOk bool
 	signSubdomains bool
 
-	log log.Logger
+	log *log.Logger
 }
 
-func New(_, instName string, _, inlineArgs []string) (module.Module, error) {
+func New(c *container.C, modName, instName string) (module.Module, error) {
 	m := &Modifier{
 		instName: instName,
 		signers:  map[string]crypto.Signer{},
-		log:      log.Logger{Name: "modify.dkim"},
+		log:      c.DefaultLogger.Sublogger(modName),
 	}
-
-	if len(inlineArgs) == 0 {
-		return m, nil
-	}
-	if len(inlineArgs) == 1 {
-		return nil, errors.New("modify.dkim: at least two arguments required")
-	}
-
-	m.domains = inlineArgs[0 : len(inlineArgs)-1]
-	m.selector = inlineArgs[len(inlineArgs)-1]
 
 	return m, nil
 }
@@ -139,7 +131,16 @@ func (m *Modifier) InstanceName() string {
 	return m.instName
 }
 
-func (m *Modifier) Init(cfg *config.Map) error {
+func (m *Modifier) Configure(inlineArgs []string, cfg *config.Map) error {
+	if len(inlineArgs) != 0 {
+		if len(inlineArgs) == 1 {
+			return errors.New("modify.dkim: at least two arguments required")
+		}
+
+		m.domains = inlineArgs[0 : len(inlineArgs)-1]
+		m.selector = inlineArgs[len(inlineArgs)-1]
+	}
+
 	var (
 		hashName        string
 		keyPathTemplate string
@@ -255,7 +256,7 @@ type state struct {
 	m    *Modifier
 	meta *module.MsgMetadata
 	from string
-	log  log.Logger
+	log  *log.Logger
 }
 
 func (m *Modifier) ModStateForMsg(ctx context.Context, msgMeta *module.MsgMetadata) (module.ModifierState, error) {
@@ -271,7 +272,7 @@ func (s *state) RewriteSender(ctx context.Context, mailFrom string) (string, err
 	return mailFrom, nil
 }
 
-func (s state) RewriteRcpt(ctx context.Context, rcptTo string) ([]string, error) {
+func (s *state) RewriteRcpt(ctx context.Context, rcptTo string) ([]string, error) {
 	return []string{rcptTo}, nil
 }
 
@@ -342,16 +343,16 @@ func (s *state) RewriteBody(ctx context.Context, h *textproto.Header, body buffe
 		return exterrors.WithFields(err, map[string]interface{}{"modifier": "modify.dkim"})
 	}
 	if err := textproto.WriteHeader(signer, *h); err != nil {
-		signer.Close()
+		_ = signer.Close()
 		return exterrors.WithFields(err, map[string]interface{}{"modifier": "modify.dkim"})
 	}
 	r, err := body.Open()
 	if err != nil {
-		signer.Close()
+		_ = signer.Close()
 		return exterrors.WithFields(err, map[string]interface{}{"modifier": "modify.dkim"})
 	}
 	if _, err := io.Copy(signer, r); err != nil {
-		signer.Close()
+		_ = signer.Close()
 		return exterrors.WithFields(err, map[string]interface{}{"modifier": "modify.dkim"})
 	}
 
@@ -366,10 +367,10 @@ func (s *state) RewriteBody(ctx context.Context, h *textproto.Header, body buffe
 	return nil
 }
 
-func (s state) Close() error {
+func (s *state) Close() error {
 	return nil
 }
 
 func init() {
-	module.Register("modify.dkim", New)
+	modules.Register("modify.dkim", New)
 }

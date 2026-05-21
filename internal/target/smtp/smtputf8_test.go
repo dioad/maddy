@@ -22,19 +22,23 @@ import (
 	"testing"
 
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/internal/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDownstreamDelivery_EHLO_ALabel(t *testing.T) {
 	be, srv := testutils.SMTPServer(t, "127.0.0.1:"+testPort)
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 	defer testutils.CheckSMTPConnLeak(t, srv)
 
-	mod, err := NewDownstream("", "", nil, []string{"tcp://127.0.0.1:" + testPort})
+	mod, err := New(container.New(), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := mod.Init(config.NewMap(nil, config.Node{
+	if err := mod.Configure([]string{"tcp://127.0.0.1:" + testPort}, config.NewMap(nil, config.Node{
 		Children: []config.Node{
 			{
 				Name: "hostname",

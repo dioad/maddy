@@ -117,13 +117,13 @@ func BenchDelivery(b *testing.B, target module.DeliveryTarget, sender string, re
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		delivery, err := target.Start(benchCtx, &meta, sender)
+		delivery, err := target.StartDelivery(benchCtx, &meta, sender)
 		if err != nil {
 			b.Fatal(err)
 		}
 
 		for i, rcptTemplate := range recipientTemplates {
-			rcpt := strings.Replace(rcptTemplate, "X", strconv.Itoa(i), -1)
+			rcpt := strings.ReplaceAll(rcptTemplate, "X", strconv.Itoa(i))
 
 			if err := delivery.AddRcpt(benchCtx, rcpt, smtp.RcptOptions{}); err != nil {
 				b.Fatal(err)

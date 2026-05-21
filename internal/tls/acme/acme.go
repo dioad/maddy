@@ -9,9 +9,11 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/foxcpp/maddy/framework/config"
 	modconfig "github.com/foxcpp/maddy/framework/config/module"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/hooks"
 	"github.com/foxcpp/maddy/framework/log"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 )
 
 const modName = "tls.loader.acme"
@@ -19,25 +21,27 @@ const modName = "tls.loader.acme"
 type Loader struct {
 	instName string
 
+	names        []string
 	store        certmagic.Storage
 	cache        *certmagic.Cache
 	cfg          *certmagic.Config
 	cancelManage context.CancelFunc
 
-	log log.Logger
+	log *log.Logger
 }
 
-func New(_, instName string, _, inlineArgs []string) (module.Module, error) {
-	if len(inlineArgs) != 0 {
-		return nil, fmt.Errorf("%s: no inline args expected", modName)
-	}
+func New(c *container.C, _, instName string) (module.Module, error) {
 	return &Loader{
 		instName: instName,
-		log:      log.Logger{Name: modName},
+		log:      c.DefaultLogger.Sublogger(modName),
 	}, nil
 }
 
-func (l *Loader) Init(cfg *config.Map) error {
+func (l *Loader) Configure(inlineArgs []string, cfg *config.Map) error {
+	if len(inlineArgs) != 0 {
+		return fmt.Errorf("%s: no inline args expected", modName)
+	}
+
 	var (
 		hostname       string
 		extraNames     []string
@@ -118,17 +122,7 @@ func (l *Loader) Init(cfg *config.Map) error {
 	}
 	l.cfg.Issuers = []certmagic.Issuer{issuer}
 
-	if module.NoRun {
-		return nil
-	}
-
-	manageCtx, cancelManage := context.WithCancel(context.Background())
-	err := l.cfg.ManageAsync(manageCtx, append([]string{hostname}, extraNames...))
-	if err != nil {
-		cancelManage()
-		return err
-	}
-	l.cancelManage = cancelManage
+	l.names = append([]string{hostname}, extraNames...)
 
 	return nil
 }
@@ -138,7 +132,18 @@ func (l *Loader) ConfigureTLS(c *tls.Config) error {
 	return nil
 }
 
-func (l *Loader) Close() error {
+func (l *Loader) Start() error {
+	manageCtx, cancelManage := context.WithCancel(context.Background())
+	err := l.cfg.ManageAsync(manageCtx, l.names)
+	if err != nil {
+		cancelManage()
+		return err
+	}
+	l.cancelManage = cancelManage
+	return nil
+}
+
+func (l *Loader) Stop() error {
 	l.cancelManage()
 	l.cache.Stop()
 	return nil
@@ -160,5 +165,5 @@ func init() {
 
 func init() {
 	var _ module.TLSLoader = &Loader{}
-	module.Register(modName, New)
+	modules.Register(modName, New)
 }

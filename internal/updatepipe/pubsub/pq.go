@@ -20,12 +20,12 @@ type PqPubSub struct {
 	L      *pq.Listener
 	sender *sql.DB
 
-	Log log.Logger
+	Log *log.Logger
 }
 
 func NewPQ(dsn string) (*PqPubSub, error) {
 	l := &PqPubSub{
-		Log:    log.Logger{Name: "pgpubsub"},
+		Log:    log.DefaultLogger.Sublogger("pgpubsub"),
 		Notify: make(chan Msg),
 	}
 	l.L = pq.NewListener(dsn, 10*time.Second, time.Minute, l.eventHandler)
@@ -50,8 +50,12 @@ func NewPQ(dsn string) (*PqPubSub, error) {
 }
 
 func (l *PqPubSub) Close() error {
-	l.sender.Close()
-	l.L.Close()
+	if err := l.sender.Close(); err != nil {
+		l.Log.Error("failed to close sender socket", err)
+	}
+	if err := l.L.Close(); err != nil {
+		l.Log.Error("failed to close listener", err)
+	}
 	return nil
 }
 

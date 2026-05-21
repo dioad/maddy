@@ -28,7 +28,9 @@ import (
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
 	modconfig "github.com/foxcpp/maddy/framework/config/module"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 )
 
 // replaceAddr is a simple module that replaces matching sender (or recipient) address
@@ -37,20 +39,18 @@ import (
 // If created with modName = "modify.replace_sender", it will change sender address.
 // If created with modName = "modify.replace_rcpt", it will change recipient addresses.
 type replaceAddr struct {
-	modName    string
-	instName   string
-	inlineArgs []string
+	modName  string
+	instName string
 
 	replaceSender bool
 	replaceRcpt   bool
 	table         module.MultiTable
 }
 
-func NewReplaceAddr(modName, instName string, _, inlineArgs []string) (module.Module, error) {
+func NewReplaceAddr(c *container.C, modName, instName string) (module.Module, error) {
 	r := replaceAddr{
 		modName:       modName,
 		instName:      instName,
-		inlineArgs:    inlineArgs,
 		replaceSender: modName == "modify.replace_sender",
 		replaceRcpt:   modName == "modify.replace_rcpt",
 	}
@@ -58,23 +58,23 @@ func NewReplaceAddr(modName, instName string, _, inlineArgs []string) (module.Mo
 	return &r, nil
 }
 
-func (r *replaceAddr) Init(cfg *config.Map) error {
-	return modconfig.ModuleFromNode("table", r.inlineArgs, cfg.Block, cfg.Globals, &r.table)
+func (r *replaceAddr) Configure(inlineArgs []string, cfg *config.Map) error {
+	return modconfig.ModuleFromNode("table", inlineArgs, cfg.Block, cfg.Globals, &r.table)
 }
 
-func (r replaceAddr) Name() string {
+func (r *replaceAddr) Name() string {
 	return r.modName
 }
 
-func (r replaceAddr) InstanceName() string {
+func (r *replaceAddr) InstanceName() string {
 	return r.instName
 }
 
-func (r replaceAddr) ModStateForMsg(ctx context.Context, msgMeta *module.MsgMetadata) (module.ModifierState, error) {
+func (r *replaceAddr) ModStateForMsg(ctx context.Context, msgMeta *module.MsgMetadata) (module.ModifierState, error) {
 	return r, nil
 }
 
-func (r replaceAddr) RewriteSender(ctx context.Context, mailFrom string) (string, error) {
+func (r *replaceAddr) RewriteSender(ctx context.Context, mailFrom string) (string, error) {
 	if r.replaceSender {
 		results, err := r.rewrite(ctx, mailFrom)
 		if err != nil {
@@ -85,22 +85,22 @@ func (r replaceAddr) RewriteSender(ctx context.Context, mailFrom string) (string
 	return mailFrom, nil
 }
 
-func (r replaceAddr) RewriteRcpt(ctx context.Context, rcptTo string) ([]string, error) {
+func (r *replaceAddr) RewriteRcpt(ctx context.Context, rcptTo string) ([]string, error) {
 	if r.replaceRcpt {
 		return r.rewrite(ctx, rcptTo)
 	}
 	return []string{rcptTo}, nil
 }
 
-func (r replaceAddr) RewriteBody(ctx context.Context, h *textproto.Header, body buffer.Buffer) error {
+func (r *replaceAddr) RewriteBody(ctx context.Context, h *textproto.Header, body buffer.Buffer) error {
 	return nil
 }
 
-func (r replaceAddr) Close() error {
+func (r *replaceAddr) Close() error {
 	return nil
 }
 
-func (r replaceAddr) rewrite(ctx context.Context, val string) ([]string, error) {
+func (r *replaceAddr) rewrite(ctx context.Context, val string) ([]string, error) {
 	normAddr, err := address.ForLookup(val)
 	if err != nil {
 		return []string{val}, fmt.Errorf("malformed address: %v", err)
@@ -151,6 +151,6 @@ func (r replaceAddr) rewrite(ctx context.Context, val string) ([]string, error) 
 }
 
 func init() {
-	module.Register("modify.replace_sender", NewReplaceAddr)
-	module.Register("modify.replace_rcpt", NewReplaceAddr)
+	modules.Register("modify.replace_sender", NewReplaceAddr)
+	modules.Register("modify.replace_rcpt", NewReplaceAddr)
 }

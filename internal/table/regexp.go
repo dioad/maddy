@@ -25,13 +25,14 @@ import (
 	"strings"
 
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 )
 
 type Regexp struct {
-	modName    string
-	instName   string
-	inlineArgs []string
+	modName  string
+	instName string
 
 	re           *regexp.Regexp
 	replacements []string
@@ -39,15 +40,14 @@ type Regexp struct {
 	expandPlaceholders bool
 }
 
-func NewRegexp(modName, instName string, _, inlineArgs []string) (module.Module, error) {
+func NewRegexp(_ *container.C, modName, instName string) (module.Module, error) {
 	return &Regexp{
-		modName:    modName,
-		instName:   instName,
-		inlineArgs: inlineArgs,
+		modName:  modName,
+		instName: instName,
 	}, nil
 }
 
-func (r *Regexp) Init(cfg *config.Map) error {
+func (r *Regexp) Configure(inlineArgs []string, cfg *config.Map) error {
 	var (
 		fullMatch       bool
 		caseInsensitive bool
@@ -59,9 +59,9 @@ func (r *Regexp) Init(cfg *config.Map) error {
 		return err
 	}
 
-	regex := r.inlineArgs[0]
-	if len(r.inlineArgs) > 1 {
-		r.replacements = r.inlineArgs[1:]
+	regex := inlineArgs[0]
+	if len(inlineArgs) > 1 {
+		r.replacements = inlineArgs[1:]
 	}
 
 	if fullMatch {
@@ -123,5 +123,5 @@ func (r *Regexp) Lookup(ctx context.Context, key string) (string, bool, error) {
 }
 
 func init() {
-	module.Register("table.regexp", NewRegexp)
+	modules.Register("table.regexp", NewRegexp)
 }

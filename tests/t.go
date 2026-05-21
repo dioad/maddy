@@ -40,6 +40,8 @@ import (
 	"time"
 
 	"github.com/foxcpp/go-mockdns"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -60,13 +62,16 @@ type T struct {
 	portsRev map[uint16]string
 
 	servProc *exec.Cmd
+
+	reloadedChan chan struct{}
 }
 
 func NewT(t *testing.T) *T {
 	return &T{
-		T:        t,
-		ports:    map[string]uint16{},
-		portsRev: map[uint16]string{},
+		T:            t,
+		ports:        map[string]uint16{},
+		portsRev:     map[uint16]string{},
+		reloadedChan: make(chan struct{}, 1),
 	}
 }
 
@@ -75,11 +80,21 @@ func NewT(t *testing.T) *T {
 func (t *T) Config(cfg string) {
 	t.Helper()
 
-	if t.servProc != nil {
-		panic("tests: Config called after Run")
-	}
-
 	t.cfg = cfg
+
+	if t.servProc != nil {
+		t.Log("Reloading configuration for running server...")
+
+		configPreable := "state_dir " + filepath.Join(t.testDir, "statedir") + "\n" +
+			"runtime_dir " + filepath.Join(t.testDir, "runtimedir") + "\n\n"
+
+		err := os.WriteFile(filepath.Join(t.testDir, "maddy.conf"), []byte(configPreable+t.cfg), os.ModePerm)
+		if err != nil {
+			t.Fatal("Test configuration failed:", err)
+		}
+
+		t.reloadConfig()
+	}
 }
 
 // DNS sets the DNS zones to emulate for the tested server instance.
@@ -98,15 +113,28 @@ func (t *T) DNS(zones map[string]mockdns.Zone) {
 
 	if t.dnsServ != nil {
 		t.Log("NOTE: Multiple DNS calls, replacing the server instance...")
-		t.dnsServ.Close()
+		require.NoError(t, t.dnsServ.Close())
 	}
 
-	dnsServ, err := mockdns.NewServer(zones, false)
+	dnsServ, err := mockdns.NewServerWithLogger(zones, t, false)
 	if err != nil {
 		t.Fatal("Test configuration failed:", err)
 	}
 	dnsServ.Log = t
 	t.dnsServ = dnsServ
+
+	t.Cleanup(func() {
+		if t.dnsServ == nil {
+			return
+		}
+
+		// Shutdown the DNS server after maddy to make sure it will not spend time
+		// timing out queries.
+		if err := t.dnsServ.Close(); err != nil {
+			t.Log("Unable to stop the DNS server:", err)
+		}
+		t.dnsServ = nil
+	})
 }
 
 // Port allocates the random TCP port for use by test. It will made accessible
@@ -141,15 +169,6 @@ func (t *T) ensureCanRun() {
 		// any DNS queries to the real world.
 		t.Log("NOTE: Explicit DNS(nil) is recommended.")
 		t.DNS(nil)
-
-		t.Cleanup(func() {
-			// Shutdown the DNS server after maddy to make sure it will not spend time
-			// timing out queries.
-			if err := t.dnsServ.Close(); err != nil {
-				t.Log("Unable to stop the DNS server:", err)
-			}
-			t.dnsServ = nil
-		})
 	}
 
 	// Setup file system, create statedir, runtimedir, write out config.
@@ -174,7 +193,7 @@ func (t *T) ensureCanRun() {
 			}
 
 			t.Log("removing", t.testDir)
-			os.RemoveAll(t.testDir)
+			assert.NoError(t, os.RemoveAll(t.testDir))
 			t.testDir = ""
 		})
 	}
@@ -198,7 +217,7 @@ func (t *T) buildCmd(additionalArgs ...string) *exec.Cmd {
 	args := []string{"-config", filepath.Join(t.testDir, "maddy.conf"),
 		"-debug.smtpport", remoteSmtp,
 		"-debug.dnsoverride", t.dnsServ.LocalAddr().String(),
-		"-log", "/tmp/test.log"}
+	}
 
 	if CoverageOut != "" {
 		args = append(args, "-test.coverprofile", CoverageOut+"."+strconv.FormatInt(time.Now().UnixNano(), 16))
@@ -242,7 +261,8 @@ func (t *T) MustRunCLIGroup(args ...[]string) {
 
 			_, err := t.RunCLI(arg...)
 			if err != nil {
-				t.Fatalf("maddy %v: %v", arg, err)
+				t.Printf("maddy %v: %v", arg, err)
+				t.Fail()
 			}
 		}()
 	}
@@ -298,33 +318,37 @@ func (t *T) Run(waitListeners int) {
 		t.Fatal("Test configuration failed:", err)
 	}
 
-	// Log scanning goroutine checks for the "listening" messages and sends 'true'
-	// on the channel each time.
-	listeningMsg := make(chan bool)
+	serverStarted := make(chan bool)
 
 	go func() {
-		defer logOut.Close()
-		defer close(listeningMsg)
+		defer close(serverStarted)
 		scnr := bufio.NewScanner(logOut)
 		for scnr.Scan() {
 			line := scnr.Text()
 
-			if strings.Contains(line, "listening on") {
-				listeningMsg <- true
-				line += " (test runner>listener wait trigger<)"
+			t.Log("maddy:", line)
+
+			if strings.HasPrefix(line, "server started") {
+				serverStarted <- true
 			}
 
-			t.Log("maddy:", line)
+			if strings.HasPrefix(line, "new server started") {
+				select {
+				case t.reloadedChan <- struct{}{}:
+					t.Log("server reload confirmed, continuing test")
+				default:
+					t.Log("unexpected reloads detected")
+					t.Fail()
+				}
+			}
 		}
 		if err := scnr.Err(); err != nil {
 			t.Log("stderr I/O error:", err)
 		}
 	}()
 
-	for i := 0; i < waitListeners; i++ {
-		if !<-listeningMsg {
-			t.Fatal("Log ended before all expected listeners are up. Start-up error?")
-		}
+	if !<-serverStarted {
+		t.Fatal("Log ended before all expected listeners are up. Start-up error?")
 	}
 
 	t.servProc = cmd
@@ -343,7 +367,7 @@ func (t *T) RuntimeDir() string {
 func (t *T) killServer() {
 	if err := t.servProc.Process.Signal(os.Interrupt); err != nil {
 		t.Log("Unable to kill the server process:", err)
-		os.RemoveAll(t.testDir)
+		assert.NoError(t, os.RemoveAll(t.testDir))
 		return // Return, as now it is pointless to wait for it.
 	}
 

@@ -73,7 +73,7 @@ type C struct {
 	TLSConfig *tls.Config
 
 	// Logger to use for debug log and certain errors.
-	Log log.Logger
+	Log *log.Logger
 
 	// Include the remote server address in SMTP status messages in the form
 	// "ADDRESS said: ..."
@@ -228,6 +228,12 @@ func (c *C) RemoteAddr() net.Addr {
 	return c.conn.RemoteAddr()
 }
 
+func (c *C) closeClient(cl *smtp.Client) {
+	if err := cl.Close(); err != nil {
+		c.Log.Error("client connection close failed", err)
+	}
+}
+
 func (c *C) attemptConnect(ctx context.Context, lmtp bool, endp config.Endpoint, starttls bool, tlsConfig *tls.Config) (didTLS bool, cl *smtp.Client, conn net.Conn, err error) {
 	dialCtx, cancel := context.WithTimeout(ctx, c.ConnectTimeout)
 	conn, err = c.Dialer(dialCtx, endp.Network(), endp.Address())
@@ -255,7 +261,7 @@ func (c *C) attemptConnect(ctx context.Context, lmtp bool, endp config.Endpoint,
 
 	// i18n: hostname is already expected to be in A-labels form.
 	if err := cl.Hello(c.Hostname); err != nil {
-		cl.Close()
+		c.closeClient(cl)
 		return false, nil, nil, err
 	}
 
@@ -265,7 +271,7 @@ func (c *C) attemptConnect(ctx context.Context, lmtp bool, endp config.Endpoint,
 
 	if ok, _ := cl.Extension("STARTTLS"); !ok {
 		if err := cl.Quit(); err != nil {
-			cl.Close()
+			c.closeClient(cl)
 		}
 		return false, nil, nil, fmt.Errorf("TLS required but unsupported by downstream")
 	}
@@ -278,7 +284,7 @@ func (c *C) attemptConnect(ctx context.Context, lmtp bool, endp config.Endpoint,
 		// *after* the handshake (e.g. PKI verification fail), we don't log the error in
 		// this case though.
 		if err := cl.Quit(); err != nil {
-			cl.Close()
+			c.closeClient(cl)
 		}
 
 		return false, nil, nil, TLSError{err}
@@ -286,7 +292,7 @@ func (c *C) attemptConnect(ctx context.Context, lmtp bool, endp config.Endpoint,
 
 	// Re-do HELO using our hostname instead of localhost.
 	if err := cl.Hello(c.Hostname); err != nil {
-		cl.Close()
+		c.closeClient(cl)
 
 		var tlsErr *tls.CertificateVerificationError
 		if errors.As(err, &tlsErr) {
@@ -376,7 +382,7 @@ func (c *C) Rcpt(ctx context.Context, to string, opts smtp.RcptOptions) error {
 		// TODO: DSN support
 	}
 
-	// If necessary, the extension flag is enabled in Start.
+	// If necessary, the extension flag is enabled in StartDelivery.
 	if ok, _ := c.cl.Extension("SMTPUTF8"); !address.IsASCII(to) && !ok {
 		var err error
 		to, err = address.ToASCII(to)
@@ -551,8 +557,8 @@ func (c *C) Close() error {
 // DirectClose closes the underlying connection without sending the QUIT
 // command.
 func (c *C) DirectClose() error {
-	c.cl.Close()
+	cl := c.cl
 	c.cl = nil
 	c.serverName = ""
-	return nil
+	return cl.Close()
 }

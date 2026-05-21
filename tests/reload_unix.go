@@ -1,9 +1,8 @@
-//go:build !nosqlite3 && cgo
-// +build !nosqlite3,cgo
+//go:build unix
 
 /*
 Maddy Mail Server - Composable all-in-one email server.
-Copyright © 2019-2020 Max Mazurov <fox.cpp@disroot.org>, Maddy Mail Server contributors
+Copyright © 2019-2026 Max Mazurov <fox.cpp@disroot.org>, Maddy Mail Server contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,8 +18,25 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package imapsql
+package tests
 
-import _ "github.com/mattn/go-sqlite3"
+import (
+	"syscall"
+	"time"
+)
 
-const sqliteImpl = "cgo"
+func (t *T) reloadConfig() {
+	err := t.servProc.Process.Signal(syscall.SIGUSR2)
+	if err != nil {
+		t.Fatal("Failed to send SIGUSR2:", err)
+	}
+
+	t.Log("waiting for server to reload...")
+
+	select {
+	case <-t.reloadedChan:
+	case <-time.After(5 * time.Second):
+		t.killServer()
+		t.Fatal("Server reload is taking too long, killed")
+	}
+}

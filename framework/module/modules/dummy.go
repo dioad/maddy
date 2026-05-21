@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package module
+package modules
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 	"github.com/emersion/go-smtp"
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
+	"github.com/foxcpp/maddy/framework/module"
 )
 
 // Dummy is a struct that implements PlainAuth and DeliveryTarget
@@ -54,11 +56,11 @@ func (d *Dummy) InstanceName() string {
 	return d.instName
 }
 
-func (d *Dummy) Init(_ *config.Map) error {
+func (d *Dummy) Configure(_ []string, _ *config.Map) error {
 	return nil
 }
 
-func (d *Dummy) Start(ctx context.Context, msgMeta *MsgMetadata, mailFrom string) (Delivery, error) {
+func (d *Dummy) StartDelivery(ctx context.Context, msgMeta *module.MsgMetadata, mailFrom string) (module.Delivery, error) {
 	return dummyDelivery{}, nil
 }
 
@@ -80,8 +82,6 @@ func (dd dummyDelivery) Commit(ctx context.Context) error {
 	return nil
 }
 
-func init() {
-	Register("dummy", func(_, instName string, _, _ []string) (Module, error) {
-		return &Dummy{instName: instName}, nil
-	})
+func NewDummy(_ *container.C, _, instName string) (module.Module, error) {
+	return &Dummy{instName: instName}, nil
 }

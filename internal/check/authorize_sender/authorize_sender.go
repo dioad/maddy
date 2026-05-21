@@ -20,15 +20,18 @@ package authorize_sender
 
 import (
 	"context"
+	"fmt"
 	"net/mail"
 
 	"github.com/emersion/go-message/textproto"
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
 	modconfig "github.com/foxcpp/maddy/framework/config/module"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/exterrors"
 	"github.com/foxcpp/maddy/framework/log"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 	"github.com/foxcpp/maddy/internal/authz"
 	"github.com/foxcpp/maddy/internal/table"
 	"github.com/foxcpp/maddy/internal/target"
@@ -38,7 +41,7 @@ const modName = "check.authorize_sender"
 
 type Check struct {
 	instName string
-	log      log.Logger
+	log      *log.Logger
 
 	checkHeader  bool
 	emailPrepare module.Table
@@ -52,9 +55,10 @@ type Check struct {
 	authNorm authz.NormalizeFunc
 }
 
-func New(_, instName string, _, inlineArgs []string) (module.Module, error) {
+func New(c *container.C, modName, instName string) (module.Module, error) {
 	return &Check{
 		instName: instName,
+		log:      c.DefaultLogger.Sublogger(modName),
 	}, nil
 }
 
@@ -66,7 +70,11 @@ func (c *Check) InstanceName() string {
 	return c.instName
 }
 
-func (c *Check) Init(cfg *config.Map) error {
+func (c *Check) Configure(inlineArgs []string, cfg *config.Map) error {
+	if len(inlineArgs) != 0 {
+		return fmt.Errorf("%s: inline arguments are not used", modName)
+	}
+
 	cfg.Bool("debug", true, false, &c.log.Debug)
 
 	cfg.Bool("check_header", false, true, &c.checkHeader)
@@ -103,7 +111,7 @@ func (c *Check) Init(cfg *config.Map) error {
 type state struct {
 	c       *Check
 	msgMeta *module.MsgMetadata
-	log     log.Logger
+	log     *log.Logger
 }
 
 func (c *Check) CheckStateForMsg(_ context.Context, msgMeta *module.MsgMetadata) (module.CheckState, error) {
@@ -301,5 +309,5 @@ func (s *state) Close() error {
 }
 
 func init() {
-	module.Register(modName, New)
+	modules.Register(modName, New)
 }

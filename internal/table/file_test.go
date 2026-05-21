@@ -25,7 +25,10 @@ import (
 	"time"
 
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/internal/testutils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadFile(t *testing.T) {
@@ -36,8 +39,18 @@ func TestReadFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		defer f.Close()
+		defer func(name string) {
+			err := os.Remove(name)
+			if err != nil {
+				t.Log(err)
+			}
+		}(f.Name())
+		defer func(f *os.File) {
+			err := f.Close()
+			if err != nil {
+				t.Log(err)
+			}
+		}(f)
 		if _, err := f.WriteString(file); err != nil {
 			t.Fatal(err)
 		}
@@ -91,22 +104,35 @@ func TestFileReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Log(err)
+		}
+	}(f.Name())
 	if _, err := f.WriteString(file); err != nil {
-		f.Close()
+		_ = f.Close()
 		t.Fatal(err)
 	}
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	mod, err := NewFile("", "", nil, []string{f.Name()})
+	mod, err := NewFile(container.New(), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := mod.(*File)
+	if err := m.Start(); err != nil {
+		t.Fatal(err)
+	}
 	m.log = testutils.Logger(t, "file_map")
-	defer m.Close()
+	defer func() {
+		assert.NoError(t, m.Stop())
+	}()
 
-	if err := mod.Init(&config.Map{Block: config.Node{}}); err != nil {
+	if err := mod.Configure([]string{f.Name()}, &config.Map{Block: config.Node{}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -142,22 +168,35 @@ func TestFileReload_Broken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f.Name())
 	if _, err := f.WriteString(file); err != nil {
-		f.Close()
+		require.NoError(t, f.Close())
 		t.Fatal(err)
 	}
-	f.Close()
+	require.NoError(t, f.Close())
 
-	mod, err := NewFile("", "", nil, []string{f.Name()})
+	mod, err := NewFile(container.New(), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := mod.(*File)
+	if err := m.Start(); err != nil {
+		t.Fatal(err)
+	}
 	m.log = testutils.Logger(t, FileModName)
-	defer m.Close()
+	defer func(m *File) {
+		err := m.Stop()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(m)
 
-	if err := mod.Init(&config.Map{Block: config.Node{}}); err != nil {
+	if err := mod.Configure([]string{f.Name()}, &config.Map{Block: config.Node{}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,7 +207,12 @@ func TestFileReload_Broken(t *testing.T) {
 	if _, err := f2.WriteString(":"); err != nil {
 		t.Fatal(err)
 	}
-	defer f2.Close()
+	defer func(f2 *os.File) {
+		err := f2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(f2)
 
 	time.Sleep(3 * reloadInterval)
 
@@ -189,24 +233,38 @@ func TestFileReload_Removed(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := f.WriteString(file); err != nil {
-		f.Close()
+		_ = f.Close()
 		t.Fatal(err)
 	}
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	mod, err := NewFile("", "", nil, []string{f.Name()})
+	mod, err := NewFile(container.New(), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := mod.(*File)
+	if err := m.Start(); err != nil {
+		t.Fatal(err)
+	}
 	m.log = testutils.Logger(t, FileModName)
-	defer m.Close()
+	defer func(m *File) {
+		err := m.Stop()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(m)
 
-	if err := mod.Init(&config.Map{Block: config.Node{}}); err != nil {
+	if err := mod.Configure([]string{f.Name()}, &config.Map{Block: config.Node{}}); err != nil {
 		t.Fatal(err)
 	}
 
-	os.Remove(f.Name())
+	err = os.Remove(f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	time.Sleep(3 * reloadInterval)
 

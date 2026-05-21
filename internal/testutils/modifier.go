@@ -24,7 +24,9 @@ import (
 	"github.com/emersion/go-message/textproto"
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 )
 
 type Modifier struct {
@@ -42,7 +44,7 @@ type Modifier struct {
 	UnclosedStates int
 }
 
-func (m Modifier) Init(*config.Map) error {
+func (m Modifier) Configure([]string, *config.Map) error {
 	return nil
 }
 
@@ -115,8 +117,7 @@ func (ms modifierState) Close() error {
 }
 
 func init() {
-	module.Register("test_modifier", func(_, _ string, _, _ []string) (module.Module, error) {
+	modules.Register("test_modifier", func(_ *container.C, _, _ string) (module.Module, error) {
 		return &Modifier{}, nil
 	})
-	module.RegisterInstance(&Modifier{}, nil)
 }

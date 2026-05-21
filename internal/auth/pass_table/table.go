@@ -25,30 +25,30 @@ import (
 
 	"github.com/foxcpp/maddy/framework/config"
 	modconfig "github.com/foxcpp/maddy/framework/config/module"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/text/secure/precis"
 )
 
 type Auth struct {
-	modName    string
-	instName   string
-	inlineArgs []string
+	modName  string
+	instName string
 
 	table module.Table
 }
 
-func New(modName, instName string, _, inlineArgs []string) (module.Module, error) {
+func New(_ *container.C, modName, instName string) (module.Module, error) {
 	return &Auth{
-		modName:    modName,
-		instName:   instName,
-		inlineArgs: inlineArgs,
+		modName:  modName,
+		instName: instName,
 	}, nil
 }
 
-func (a *Auth) Init(cfg *config.Map) error {
-	if len(a.inlineArgs) != 0 {
-		return modconfig.ModuleFromNode("table", a.inlineArgs, cfg.Block, cfg.Globals, &a.table)
+func (a *Auth) Configure(inlineArgs []string, cfg *config.Map) error {
+	if len(inlineArgs) != 0 {
+		return modconfig.ModuleFromNode("table", inlineArgs, cfg.Block, cfg.Globals, &a.table)
 	}
 
 	cfg.Custom("table", false, true, nil, modconfig.TableDirective, &a.table)
@@ -194,5 +194,5 @@ func (a *Auth) DeleteUser(username string) error {
 }
 
 func init() {
-	module.Register("auth.pass_table", New)
+	modules.Register("auth.pass_table", New)
 }

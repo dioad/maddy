@@ -14,6 +14,7 @@ smtp tcp://0.0.0.0:25 {
     sasl_login no
     read_timeout 10m
     write_timeout 1m
+    shutdown_timeout 3m
     max_message_size 32M
     max_header_size 1M
     auth pam
@@ -25,7 +26,7 @@ smtp tcp://0.0.0.0:25 {
         endpoint concurrency 500
     }
 
-    # Example pipeline ocnfiguration.
+    # Example pipeline configuration.
     destination example.org {
         deliver_to &local_mailboxes
     }
@@ -122,6 +123,14 @@ I/O read timeout.
 Default: `1m`
 
 I/O write timeout.
+
+---
+
+### shutdown_timeout _duration_
+Default: `3m`
+
+Time to wait until forcibly closing connections on server shutdown
+or configuration reload.
 
 ---
 

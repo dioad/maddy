@@ -7,8 +7,10 @@ import (
 	"net/http"
 
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/log"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -25,7 +27,7 @@ const (
 
 type Store struct {
 	instName string
-	log      log.Logger
+	log      *log.Logger
 
 	endpoint string
 	cl       *minio.Client
@@ -34,18 +36,18 @@ type Store struct {
 	objectPrefix string
 }
 
-func New(_, instName string, _, inlineArgs []string) (module.Module, error) {
-	if len(inlineArgs) != 0 {
-		return nil, fmt.Errorf("%s: expected 0 arguments", modName)
-	}
-
+func New(c *container.C, modName, instName string) (module.Module, error) {
 	return &Store{
 		instName: instName,
-		log:      log.Logger{Name: modName},
+		log:      c.DefaultLogger.Sublogger(modName),
 	}, nil
 }
 
-func (s *Store) Init(cfg *config.Map) error {
+func (s *Store) Configure(inlineArgs []string, cfg *config.Map) error {
+	if len(inlineArgs) != 0 {
+		return fmt.Errorf("%s: expected 0 arguments", modName)
+	}
+
 	var (
 		secure          bool
 		accessKeyID     string
@@ -120,7 +122,9 @@ func (b *s3blob) Sync() error {
 		panic("storage.blob.s3: Sync called twice for a blob object")
 	}
 
-	b.pw.Close()
+	if err := b.pw.Close(); err != nil {
+		return err
+	}
 	b.didSync = true
 	return <-b.errCh
 }
@@ -192,5 +196,5 @@ func (s *Store) Delete(ctx context.Context, keys []string) error {
 
 func init() {
 	var _ module.BlobStore = &Store{}
-	module.Register(modName, New)
+	modules.Register(modName, New)
 }
