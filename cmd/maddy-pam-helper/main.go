@@ -21,7 +21,7 @@ package main
 /*
 #cgo LDFLAGS: -lpam
 #cgo CFLAGS: -DCGO -Wall -Wextra -Werror -Wno-unused-parameter -Wno-error=unused-parameter -Wpedantic -std=c99
-extern int run();
+extern int run(void);
 */
 import "C"
 import "os"

@@ -45,7 +45,7 @@ int run(void) {
 }
 
 #ifndef CGO
-int main() {
+int main(void) {
     return run();
 }
 #endif

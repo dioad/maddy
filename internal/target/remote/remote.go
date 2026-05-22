@@ -36,6 +36,8 @@ import (
 
 	"github.com/emersion/go-message/textproto"
 	"github.com/emersion/go-smtp"
+	"golang.org/x/net/idna"
+
 	"github.com/foxcpp/maddy/framework/address"
 	"github.com/foxcpp/maddy/framework/buffer"
 	"github.com/foxcpp/maddy/framework/config"
@@ -50,7 +52,6 @@ import (
 	"github.com/foxcpp/maddy/internal/limits"
 	"github.com/foxcpp/maddy/internal/smtpconn/pool"
 	"github.com/foxcpp/maddy/internal/target"
-	"golang.org/x/net/idna"
 )
 
 var smtpPort = "25"
@@ -142,10 +143,10 @@ func (rt *Target) Configure(inlineArgs []string, cfg *config.Map) error {
 		return g, nil
 	}, &rt.limits)
 	cfg.Custom("socks5", false, false, func() (interface{}, error) {
-		rt.Log.Debugf("remote: not configuring SOCKS5 proxy")
+		rt.log.Debugf("remote: not configuring SOCKS5 proxy")
 		return nil, nil
 	}, func(cfg *config.Map, n config.Node) (interface{}, error) {
-		rt.Log.Debugf("remote: configuring SOCKS5 proxy")
+		rt.log.Debugf("remote: configuring SOCKS5 proxy")
 		var s *Socks5Group
 		if err := modconfig.GroupFromNode("socks5", n.Args, n, cfg.Globals, &s); err != nil {
 			return nil, err
@@ -200,7 +201,7 @@ func (rt *Target) Configure(inlineArgs []string, cfg *config.Map) error {
 	}
 	if rt.socks5 != nil {
 		dial := rt.dialer
-		rt.Log.Debugf("remote: SOCKS5 proxy is configured, force IPv4 mode")
+		rt.log.Debugf("remote: SOCKS5 proxy is configured, force IPv4 mode")
 		rt.dialer, err = rt.socks5.Dialer(dial)
 		if err != nil {
 			return fmt.Errorf("remote: failed to initialize SOCKS5 proxy: %w", err)

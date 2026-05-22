@@ -7,7 +7,10 @@ import (
 	"strconv"
 
 	"github.com/foxcpp/maddy/framework/config"
+	"github.com/foxcpp/maddy/framework/container"
 	"github.com/foxcpp/maddy/framework/module"
+	"github.com/foxcpp/maddy/framework/module/modules"
+
 	"golang.org/x/net/proxy"
 )
 
@@ -21,13 +24,19 @@ type Socks5Group struct {
 	password string
 }
 
-func NewSocks5Group(_, instName string, _, _ []string) (module.Module, error) {
+func (sg *Socks5Group) Configure(inlineArgs []string, config *config.Map) error {
+	return sg.init(config)
+	// TODO implement me
+	// panic("implement me")
+}
+
+func NewSocks5Group(c *container.C, _, instName string) (module.Module, error) {
 	return &Socks5Group{
 		instName: instName,
 	}, nil
 }
 
-func (sg *Socks5Group) Init(cfg *config.Map) error {
+func (sg *Socks5Group) init(cfg *config.Map) error {
 	for _, child := range cfg.Block.Children {
 		switch scope := child.Name; scope {
 		case "host":
@@ -93,9 +102,9 @@ func (sg *Socks5Group) Dialer(dialerFunc DialerFunc) (DialerFunc, error) {
 
 	return nil, fmt.Errorf("socks5 dialer does not implement proxy.ContextDialer")
 
-	//return func(ctx context.Context, network string, addr string) (net.Conn, error) {
+	// return func(ctx context.Context, network string, addr string) (net.Conn, error) {
 	//	return socksDialer.Dial(network, addr)
-	//}, nil
+	// }, nil
 }
 
 type dialer struct {
@@ -111,5 +120,5 @@ func (d dialer) Dial(network string, addr string) (net.Conn, error) {
 }
 
 func init() {
-	module.Register("socks5", NewSocks5Group)
+	modules.Register("socks5", NewSocks5Group)
 }

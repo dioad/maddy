@@ -39,6 +39,7 @@ import (
 
 	"github.com/emersion/go-message/textproto"
 	"github.com/emersion/go-smtp"
+
 	"github.com/foxcpp/maddy/framework/address"
 	"github.com/foxcpp/maddy/framework/config"
 	"github.com/foxcpp/maddy/framework/exterrors"
@@ -108,6 +109,8 @@ func (c *C) wrapClientErr(err error, serverName string) error {
 	case TLSError:
 		return err
 	case *exterrors.SMTPError:
+		return err
+	case *smtp.LMTPDataError:
 		return err
 	case *smtp.SMTPError:
 		msg := err.Message
@@ -497,21 +500,33 @@ func (c *C) Data(ctx context.Context, hdr textproto.Header, body io.Reader) erro
 func (c *C) LMTPData(ctx context.Context, hdr textproto.Header, body io.Reader, statusCb func(string, *smtp.SMTPError)) error {
 	defer trace.StartRegion(ctx, "smtpconn/LMTPDATA").End()
 
-	wc, err := c.cl.LMTPData(statusCb)
+	cmd, err := c.cl.Data()
 	if err != nil {
 		return c.wrapClientErr(err, c.serverName)
 	}
 
-	if err := textproto.WriteHeader(wc, hdr); err != nil {
+	if err := textproto.WriteHeader(cmd, hdr); err != nil {
 		return c.wrapClientErr(err, c.serverName)
 	}
 
-	if _, err := io.Copy(wc, body); err != nil {
+	if _, err := io.Copy(cmd, body); err != nil {
 		return c.wrapClientErr(err, c.serverName)
 	}
 
-	if err := wc.Close(); err != nil {
-		return c.wrapClientErr(err, c.serverName)
+	perRcptResp, closeErr := cmd.CloseWithLMTPResponse()
+
+	lmtpErr, isLMTPErr := closeErr.(smtp.LMTPDataError)
+	if closeErr != nil && !isLMTPErr {
+		// Catastrophic failure (e.g. network error); let the caller handle
+		// remaining recipients via its fallback loop.
+		return c.wrapClientErr(closeErr, c.serverName)
+	}
+
+	for rcpt := range perRcptResp {
+		statusCb(rcpt, nil)
+	}
+	for rcpt, smtpErr := range lmtpErr {
+		statusCb(rcpt, smtpErr)
 	}
 
 	return nil
