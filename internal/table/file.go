@@ -72,6 +72,9 @@ func (f *File) InstanceName() string {
 }
 
 func (f *File) Configure(inlineArgs []string, cfg *config.Map) error {
+	f.mLck.Lock()
+	defer f.mLck.Unlock()
+
 	switch len(inlineArgs) {
 	case 1:
 		f.file = inlineArgs[0]
@@ -94,12 +97,15 @@ func (f *File) Configure(inlineArgs []string, cfg *config.Map) error {
 		f.file = file
 	}
 
-	if err := readFile(f.file, f.m); err != nil {
+	newm := make(map[string][]string)
+	if err := readFile(f.file, newm); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
 		f.log.Printf("ignoring non-existent file: %s", f.file)
+		return nil
 	}
+	f.m = newm
 
 	return nil
 }
@@ -149,7 +155,11 @@ func (f *File) reloader() {
 }
 
 func (f *File) reload() {
-	info, err := os.Stat(f.file)
+	f.mLck.RLock()
+	path := f.file
+	f.mLck.RUnlock()
+
+	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			f.mLck.Lock()
@@ -165,10 +175,10 @@ func (f *File) reload() {
 
 	f.log.Debugf("reloading")
 
-	newm := make(map[string][]string, len(f.m)+5)
-	if err := readFile(f.file, newm); err != nil {
+	newm := make(map[string][]string)
+	if err := readFile(path, newm); err != nil {
 		if os.IsNotExist(err) {
-			f.log.Printf("ignoring non-existent file: %s", f.file)
+			f.log.Printf("ignoring non-existent file: %s", path)
 			return
 		}
 
@@ -176,7 +186,7 @@ func (f *File) reload() {
 		return
 	}
 	// after reading we need to check whether file has changed in between
-	info2, err := os.Stat(f.file)
+	info2, err := os.Stat(path)
 	if err != nil {
 		f.log.Println(err)
 		return
