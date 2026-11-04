@@ -19,7 +19,7 @@ jobs:
     container:
       image: "alpine:edge"
     steps:
-      - uses: actions/checkout@v1 # v2 does not work with containers
+      - uses: actions/checkout@v7 # v2 does not work with containers
       - name: "Install build dependencies"
         run: |
           apk add --no-cache gcc go zstd
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       # Building in a Docker container is a workaround for the issue of
@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: "Set up QEMU"
         uses: docker/setup-qemu-action@v1
         with:
