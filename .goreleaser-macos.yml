@@ -1,8 +1,9 @@
 version: 2
 
-# Darwin release build for the dioad fork of maddy: signed and notarized
-# binaries, uploaded to releases.lab.dioad.net. The Linux build, packages,
-# images and the GitHub release are in .goreleaser.yml.
+# Darwin release build for the dioad fork of maddy: signed binaries, uploaded
+# to releases.lab.dioad.net. Notarization runs only when the MACOS_NOTARY_*
+# secrets are set; without them GoReleaser signs and skips notarizing. The
+# Linux build, packages, images and the GitHub release are in .goreleaser.yml.
 
 before:
   hooks:
@@ -60,9 +61,9 @@ checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_darwin_SHA256SUMS"
   algorithm: sha256
 
-# Notarize signs the binaries and notarizes the archives via App Store Connect API keys.
-# Required secrets: MACOS_SIGN_P12, MACOS_SIGN_PASSWORD, MACOS_NOTARY_ISSUER_ID,
-# MACOS_NOTARY_KEY_ID, MACOS_NOTARY_KEY (base64-encoded .p8 file contents).
+# Signing needs MACOS_SIGN_P12 and MACOS_SIGN_PASSWORD. Notarizing also needs
+# an App Store Connect API key: MACOS_NOTARY_ISSUER_ID, MACOS_NOTARY_KEY_ID and
+# MACOS_NOTARY_KEY (base64-encoded .p8 file contents).
 notarize:
   macos:
     - enabled: true
