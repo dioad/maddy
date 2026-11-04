@@ -14,7 +14,7 @@ permissions:
 jobs:
   artifact-builder-x86:
     name: "Prepare release artifacts (x86)"
-    if: github.ref_type == 'tag'
+    if: github.repository == 'foxcpp/maddy' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     container:
       image: "alpine:edge"
@@ -58,7 +58,7 @@ jobs:
           subject-path: '~/maddy-x86_64-linux-musl.tar.zst'
   artifact-builder-arm:
     name: "Prepare release artifacts (aarch64)"
-    if: github.ref_type == 'tag'
+    if: github.repository == 'foxcpp/maddy' && github.ref_type == 'tag'
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout
@@ -101,7 +101,7 @@ jobs:
           subject-path: 'maddy-aarch64-linux-musl.tar.zst'
   docker-builder:
     name: "Build & push Docker image"
-    if: github.ref_type == 'tag'
+    if: github.repository == 'foxcpp/maddy' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+
+# Image for the dioad fork of maddy, built by goreleaser from a prebuilt
+# binary (see .goreleaser.yml). It keeps the upstream image's layout:
+# configuration and state in /data, the binary at /bin/maddy.
+FROM alpine:3.21
+
+LABEL org.opencontainers.image.source=https://github.com/dioad/maddy
+LABEL org.opencontainers.image.title="Maddy Mail Server (dioad fork)"
+LABEL org.opencontainers.image.licenses=GPL-3.0-or-later
+
+RUN apk add --no-cache ca-certificates
+
+COPY maddy.conf.docker /data/maddy.conf
+COPY maddy /bin/maddy
+
+EXPOSE 25 143 993 587 465
+VOLUME ["/data"]
+ENTRYPOINT ["/bin/maddy", "-config", "/data/maddy.conf"]
+CMD ["run"]

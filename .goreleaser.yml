@@ -1,0 +1,180 @@
+version: 2
+
+# Release build for the dioad fork of maddy, following the layout dioad/connect
+# and dioad/eventbroker use. Darwin builds are in .goreleaser-macos.yml.
+#
+# Tags take the form v<upstream version>-dioad.<n>, for example v0.9.5-dioad.1.
+
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+
+# maddy keeps systemd units and other packaging files in dist/, so goreleaser
+# must not use (or --clean) that directory.
+dist: goreleaser-dist
+
+snapshot:
+  version_template: "{{ .Tag }}-{{ .ShortCommit }}"
+
+builds:
+  # CGO is off, so the pure-Go modernc SQLite driver is used and the binaries
+  # are static. PAM authentication needs cgo and is not included.
+  # libdns_acmedns adds the acmedns provider dioad/connect's acme-dns mode uses,
+  # on top of the providers maddy includes by default.
+  - id: maddy
+    main: ./cmd/maddy
+    binary: maddy
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+      - amd64
+    flags:
+      - -trimpath
+    tags:
+      - libdns_acmedns
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - -s -w -X github.com/foxcpp/maddy.Version={{ .Version }}
+  # The same binary with the docker tag, which sets the state, runtime and
+  # config defaults to /data as the upstream image does.
+  - id: maddy-docker
+    main: ./cmd/maddy
+    binary: maddy
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+      - amd64
+    flags:
+      - -trimpath
+    tags:
+      - libdns_acmedns
+      - docker
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - -s -w -X github.com/foxcpp/maddy.Version={{ .Version }}
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+
+archives:
+  - id: go-archive
+    ids:
+      - maddy
+    name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    files:
+      - COPYING
+      - README.md
+      - maddy.conf
+
+nfpms:
+  - id: go-package
+    ids:
+      - maddy
+    package_name: dioad-maddy
+    homepage: https://github.com/dioad/maddy
+    description: Dioad fork of the maddy mail server
+    maintainer: Patrick Downey <patrick.downey@dioadconsulting.com>
+    license: GPL-3.0-or-later
+    vendor: Dioad Consulting Ltd.
+    contents:
+      - src: ./README.md
+        dst: /usr/share/dioad/maddy/README.md
+      - src: ./COPYING
+        dst: /usr/share/dioad/maddy/COPYING
+      - src: ./maddy.conf
+        dst: /usr/share/dioad/maddy/maddy.conf.example
+    formats:
+      - apk
+      - deb
+      - rpm
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+dockers:
+  - ids:
+      - maddy-docker
+    image_templates:
+      - "ghcr.io/dioad/maddy:{{ .Version }}-amd64"
+      - "dioad/maddy:{{ .Version }}-amd64"
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    extra_files:
+      - maddy.conf.docker
+  - ids:
+      - maddy-docker
+    image_templates:
+      - "ghcr.io/dioad/maddy:{{ .Version }}-arm64v8"
+      - "dioad/maddy:{{ .Version }}-arm64v8"
+    use: buildx
+    goarch: arm64
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/arm64/v8"
+    extra_files:
+      - maddy.conf.docker
+
+# Every fork tag carries a -dioad.<n> suffix, which semver treats as a
+# prerelease, so "latest" is skipped only for release candidates.
+docker_manifests:
+  - name_template: ghcr.io/dioad/maddy:{{ .Version }}
+    image_templates:
+      - ghcr.io/dioad/maddy:{{ .Version }}-amd64
+      - ghcr.io/dioad/maddy:{{ .Version }}-arm64v8
+  - name_template: dioad/maddy:{{ .Version }}
+    image_templates:
+      - dioad/maddy:{{ .Version }}-amd64
+      - dioad/maddy:{{ .Version }}-arm64v8
+  - name_template: ghcr.io/dioad/maddy:latest
+    skip_push: '{{ if contains .Tag "-rc" }}true{{ end }}'
+    image_templates:
+      - ghcr.io/dioad/maddy:{{ .Version }}-amd64
+      - ghcr.io/dioad/maddy:{{ .Version }}-arm64v8
+  - name_template: dioad/maddy:latest
+    skip_push: '{{ if contains .Tag "-rc" }}true{{ end }}'
+    image_templates:
+      - dioad/maddy:{{ .Version }}-amd64
+      - dioad/maddy:{{ .Version }}-arm64v8
+
+sboms:
+  - artifacts: archive
+    args: [ "$artifact", "--output", "cyclonedx-json=$document" ]
+
+publishers:
+  - name: aws S3
+    ids:
+      - go-archive
+      - go-package
+    cmd: aws s3api put-object --server-side-encryption AES256 --bucket releases.lab.dioad.net --key data/{{ .ProjectName }}/{{ .Version }}/{{ .ArtifactName }} --body {{ abs .ArtifactPath}} --tagging "Dioad/Project={{ .ProjectName }}&Dioad/Version={{ .Version }}&Dioad/Commit={{ .ShortCommit }}&Dioad/CommitDate={{ .CommitDate }}&Dioad/CommitTag={{ .Tag }}&Dioad/OS={{ .Os }}&Dioad/Architecture={{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    checksum: true
+    meta: true
+    env:
+      - AWS_DEFAULT_REGION={{ .Env.AWS_DEFAULT_REGION }}
+      - AWS_EC2_METADATA_DISABLED={{ .Env.AWS_EC2_METADATA_DISABLED }}
+      - AWS_ACCESS_KEY_ID={{ .Env.AWS_ACCESS_KEY_ID }}
+      - AWS_SECRET_ACCESS_KEY={{ .Env.AWS_SECRET_ACCESS_KEY }}
+
+release:
+  github:
+    owner: dioad
+    name: maddy
+  # The -dioad.<n> suffix would otherwise mark every release as a prerelease.
+  prerelease: false

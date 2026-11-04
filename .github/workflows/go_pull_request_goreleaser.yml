@@ -86,10 +86,10 @@ jobs:
               platforms = [ "linux/amd64", "linux/arm64/v8"  ]
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
-          args: release --rm-dist --snapshot
+          args: release --clean --snapshot --skip=publish,sbom
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
           AWS_REGION: eu-west-2
