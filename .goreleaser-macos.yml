@@ -2,8 +2,8 @@ version: 2
 
 # Darwin release build for the dioad fork of maddy: signed binaries, uploaded
 # to releases.lab.dioad.net. Notarization runs only when the MACOS_NOTARY_*
-# secrets are set; without them GoReleaser signs and skips notarizing. The Linux build, packages,
-# images and the GitHub release are in .goreleaser.yml.
+# secrets are set; without them GoReleaser signs and skips notarizing. The
+# Linux build, packages, images and the GitHub release are in .goreleaser.yml.
 
 before:
   hooks:

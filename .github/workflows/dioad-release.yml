@@ -2,8 +2,9 @@ name: Release Build (dioad)
 
 # Publishes a release of the dioad fork: Linux archives, packages and
 # multi-arch images from .goreleaser.yml, then signed darwin binaries from
-# .goreleaser-macos.yml (notarized too, once the MACOS_NOTARY_* secrets exist). Only fork tags (v<upstream>-dioad.<n>) trigger it,
-# so upstream tags merged into the fork do not.
+# .goreleaser-macos.yml (notarized too, once the MACOS_NOTARY_* secrets
+# exist). Only fork tags (v<upstream>-dioad.<n>) trigger it, so upstream tags
+# merged into the fork do not.
 
 on:
   push:
