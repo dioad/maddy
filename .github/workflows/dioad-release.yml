@@ -2,7 +2,7 @@ name: Release Build (dioad)
 
 # Publishes a release of the dioad fork: Linux archives, packages and
 # multi-arch images from .goreleaser.yml, then signed darwin binaries from
-# .goreleaser-macos.yml. Only fork tags (v<upstream>-dioad.<n>) trigger it,
+# .goreleaser-macos.yml (notarized too, once the MACOS_NOTARY_* secrets exist). Only fork tags (v<upstream>-dioad.<n>) trigger it,
 # so upstream tags merged into the fork do not.
 
 on:
@@ -95,9 +95,12 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_UPLOAD_S3_SECRET_ACCESS_KEY }}
           CI: false
 
+  # Darwin binaries are cross-compiled and signed on Linux: GoReleaser
+  # signs with quill rather than Apple's codesign, so no macOS runner (and
+  # its queue) is needed.
   macos-build:
     name: MacOS Build
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     needs:
       - build
 
