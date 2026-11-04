@@ -1,0 +1,90 @@
+version: 2
+
+# Darwin release build for the dioad fork of maddy: signed and notarized
+# binaries, uploaded to releases.lab.dioad.net. The Linux build, packages,
+# images and the GitHub release are in .goreleaser.yml.
+
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+
+# maddy keeps systemd units and other packaging files in dist/.
+dist: goreleaser-dist
+
+snapshot:
+  version_template: "{{ .Tag }}-{{ .ShortCommit }}"
+
+builds:
+  - id: maddy
+    main: ./cmd/maddy
+    binary: maddy
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+      - amd64
+    flags:
+      - -trimpath
+    tags:
+      - libdns_acmedns
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - -s -w -X github.com/foxcpp/maddy.Version={{ .Version }}
+
+universal_binaries:
+  - name_template: '{{ .ProjectName }}'
+    replace: false
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+
+archives:
+  - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    formats: [ 'zip' ]
+    files:
+      - COPYING
+      - README.md
+      - maddy.conf
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_darwin_SHA256SUMS"
+  algorithm: sha256
+
+# Notarize signs the binaries and notarizes the archives via App Store Connect API keys.
+# Required secrets: MACOS_SIGN_P12, MACOS_SIGN_PASSWORD, MACOS_NOTARY_ISSUER_ID,
+# MACOS_NOTARY_KEY_ID, MACOS_NOTARY_KEY (base64-encoded .p8 file contents).
+notarize:
+  macos:
+    - enabled: true
+      sign:
+        certificate: "{{.Env.MACOS_SIGN_P12}}"
+        password: "{{.Env.MACOS_SIGN_PASSWORD}}"
+      notarize:
+        issuer_id: "{{.Env.MACOS_NOTARY_ISSUER_ID}}"
+        key_id: "{{.Env.MACOS_NOTARY_KEY_ID}}"
+        key: "{{.Env.MACOS_NOTARY_KEY}}"
+        wait: true
+        timeout: 20m
+
+publishers:
+  - name: aws S3
+    cmd: aws s3api put-object --server-side-encryption AES256 --bucket releases.lab.dioad.net --key data/{{ .ProjectName }}/{{ .Version }}/{{ .ArtifactName }} --body {{ abs .ArtifactPath}} --tagging "Dioad/Project={{ .ProjectName }}&Dioad/Version={{ .Version }}&Dioad/Commit={{ .ShortCommit }}&Dioad/CommitDate={{ .CommitDate }}&Dioad/CommitTag={{ .Tag }}&Dioad/OS={{ .Os }}&Dioad/Architecture={{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    checksum: true
+    env:
+      - AWS_DEFAULT_REGION={{ .Env.AWS_DEFAULT_REGION }}
+      - AWS_EC2_METADATA_DISABLED={{ .Env.AWS_EC2_METADATA_DISABLED }}
+      - AWS_ACCESS_KEY_ID={{ .Env.AWS_ACCESS_KEY_ID }}
+      - AWS_SECRET_ACCESS_KEY={{ .Env.AWS_SECRET_ACCESS_KEY }}
+
+release:
+  disable: true

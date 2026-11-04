@@ -17,8 +17,8 @@ jobs:
     name: Lint
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
       - name: "Install libpam"
@@ -32,8 +32,8 @@ jobs:
     name: "Verify build.sh"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
       - name: "Install libpam"
@@ -49,8 +49,8 @@ jobs:
     name: "Build and test"
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
-    - uses: actions/setup-go@v6
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
       with:
         go-version-file: 'go.mod'
     - name: "Install libpam"

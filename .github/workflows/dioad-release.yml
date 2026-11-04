@@ -1,0 +1,133 @@
+name: Release Build (dioad)
+
+# Publishes a release of the dioad fork: Linux archives, packages and
+# multi-arch images from .goreleaser.yml, then signed darwin binaries from
+# .goreleaser-macos.yml. Only fork tags (v<upstream>-dioad.<n>) trigger it,
+# so upstream tags merged into the fork do not.
+
+on:
+  push:
+    tags:
+      - 'v*-dioad.*'
+
+jobs:
+  test:
+    name: Vet and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v7
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+        id: go
+
+      - name: Get dependencies
+        run: |
+          go mod download
+          sudo apt-get update
+          sudo apt-get install libpam0g-dev
+
+      - name: Generate
+        run: go generate ./...
+        env:
+          CI: false
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test Race Conditions
+        run: go test -race ./...
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs:
+      - test
+
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+        id: go
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          config-inline: |
+            [worker.oci]
+              platforms = [ "linux/amd64", "linux/arm64/v8"  ]
+
+      - name: Docker login
+        run: |
+          echo "${{ secrets.WORKFLOW_TOKEN }}" | docker login ghcr.io --username ${{ secrets.WORKFLOW_TOKEN_USER }} --password-stdin
+          echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login --username dioad --password-stdin
+
+      - name: Install syft (for SBOM generation)
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: latest
+          args: release --clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+          AWS_DEFAULT_REGION: eu-west-2
+          AWS_EC2_METADATA_DISABLED: true
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_UPLOAD_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_UPLOAD_S3_SECRET_ACCESS_KEY }}
+          CI: false
+
+  macos-build:
+    name: MacOS Build
+    runs-on: macos-latest
+    needs:
+      - build
+
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+        id: go
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: latest
+          args: release --clean --config .goreleaser-macos.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+          AWS_DEFAULT_REGION: eu-west-2
+          AWS_EC2_METADATA_DISABLED: true
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_UPLOAD_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_UPLOAD_S3_SECRET_ACCESS_KEY }}
+          CI: false
+          MACOS_SIGN_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_PASSPHRASE }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}

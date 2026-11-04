@@ -14,12 +14,12 @@ permissions:
 jobs:
   artifact-builder-x86:
     name: "Prepare release artifacts (x86)"
-    if: github.ref_type == 'tag'
+    if: github.repository == 'foxcpp/maddy' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     container:
       image: "alpine:edge"
     steps:
-      - uses: actions/checkout@v1 # v2 does not work with containers
+      - uses: actions/checkout@v7 # v2 does not work with containers
       - name: "Install build dependencies"
         run: |
           apk add --no-cache gcc go zstd
@@ -58,11 +58,11 @@ jobs:
           subject-path: '~/maddy-x86_64-linux-musl.tar.zst'
   artifact-builder-arm:
     name: "Prepare release artifacts (aarch64)"
-    if: github.ref_type == 'tag'
+    if: github.repository == 'foxcpp/maddy' && github.ref_type == 'tag'
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       # Building in a Docker container is a workaround for the issue of
@@ -101,11 +101,11 @@ jobs:
           subject-path: 'maddy-aarch64-linux-musl.tar.zst'
   docker-builder:
     name: "Build & push Docker image"
-    if: github.ref_type == 'tag'
+    if: github.repository == 'foxcpp/maddy' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: "Set up QEMU"
         uses: docker/setup-qemu-action@v1
         with:
