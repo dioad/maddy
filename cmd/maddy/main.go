@@ -23,7 +23,7 @@ import (
 	maddycli "github.com/foxcpp/maddy/internal/cli"
 	_ "github.com/foxcpp/maddy/internal/cli/ctl"
 
-	_ "github.com/mattn/go-sqlite3" 
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
