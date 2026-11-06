@@ -103,6 +103,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/digitalocean/godo v1.236.0 h1:xRJ7kDwpdKromP11XbttjDuq58gWcmssClptfDAAsS8=
 github.com/digitalocean/godo v1.236.0/go.mod h1:xQsWpVCCbkDrWisHA72hPzPlnC+4W5w/McZY5ij9uvU=
+github.com/dioad/go-smtp v0.24.1-0.20261106073926-66d84d4bc2a4 h1:Nl8LOy3jWdMpFJt+ak5Dmmyukh8ufz5KaeGvIiVu2aE=
+github.com/dioad/go-smtp v0.24.1-0.20261106073926-66d84d4bc2a4/go.mod h1:ZtRRkbTyp2XTHCA+BmyTFTrj8xY4I+b4McvHxCU2gsQ=
 github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5QvfrDyIgxBk=
 github.com/distribution/reference v0.6.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
 github.com/docker/go-connections v0.7.0 h1:6SsRfJddP22WMrCkj19x9WKjEDTB+ahsdiGYf0mN39c=
@@ -142,8 +144,6 @@ github.com/felixge/httpsnoop v1.1.0 h1:3YtUj32ZZkqZtt3sZZsClsymw/QDuVfpNhoA31zeO
 github.com/felixge/httpsnoop v1.1.0/go.mod h1:Zqxgdd+1Rkcz8euOqdr7lqgCRJztwr5hp9vDSi5UZCE=
 github.com/foxcpp/go-dovecot-sasl v0.0.0-20260517233401-20345a80f5bc h1:IAurIbk27Dyrpm1kQwTScaB/IzANKxiPuCPZhCEIFgk=
 github.com/foxcpp/go-dovecot-sasl v0.0.0-20260517233401-20345a80f5bc/go.mod h1:5yZUmwr851vgjyAfN7OEfnrmKOh/qLA5dbGelXYsu1E=
-github.com/foxcpp/go-imap v1.0.0-beta.1.0.20220623182312-df940c324887 h1:qUoaaHyrRpQw85ru6VQcC6JowdhrWl7lSbI1zRX1FTM=
-github.com/foxcpp/go-imap v1.0.0-beta.1.0.20220623182312-df940c324887/go.mod h1:Qlx1FSx2FTxjnjWpIlVNEuX+ylerZQNFE5NsmKFSejY=
 github.com/foxcpp/go-imap v1.0.0-beta.1.0.20261105102928-3ab0436cfe5d h1:HKq3Dvmt8P9cJb/8dqaMJIro/0r0UUR6HzTQK2mA6g8=
 github.com/foxcpp/go-imap v1.0.0-beta.1.0.20261105102928-3ab0436cfe5d/go.mod h1:Qlx1FSx2FTxjnjWpIlVNEuX+ylerZQNFE5NsmKFSejY=
 github.com/foxcpp/go-imap-backend-tests v0.0.0-20220105184719-e80aa29a5e16 h1:qheFPDpteiUy7Ym18R68OYenpk85UyKYGkhYTmddSBg=
@@ -161,8 +161,6 @@ github.com/foxcpp/go-mockdns v1.3.0 h1:p4PKLZnM1Ii78JzsxJxcYQ5sQT3lIdiPM/vT1SaL9
 github.com/foxcpp/go-mockdns v1.3.0/go.mod h1:IhLeSFGed3mJIAXPH2aiRQB+kqz7oqu8ld2qVbOu7Wk=
 github.com/foxcpp/go-mtasts v0.0.0-20261026071820-d380f1fa8aa1 h1:gXFK1gaWwY0Iy6/dzVuayJHVsj93gYy0XQObl1/3ee4=
 github.com/foxcpp/go-mtasts v0.0.0-20261026071820-d380f1fa8aa1/go.mod h1:RtHIZCsScdjIzXpTTjmEljtUrIjQbPBTvw7F1tKQbKk=
-github.com/foxcpp/go-smtp v0.25.2-0.20261105091848-78665b3182cc h1:uaiaZVzKS+8i+53Pzfj/PPoo47IU2pfLarGE5QKuH0E=
-github.com/foxcpp/go-smtp v0.25.2-0.20261105091848-78665b3182cc/go.mod h1:ZtRRkbTyp2XTHCA+BmyTFTrj8xY4I+b4McvHxCU2gsQ=
 github.com/foxcpp/libdns-gandi v1.2.2-0.20261105062312-a1407be551a8 h1:EHmLOVbuvQBniA48pvVpz7nN4YmlP5xcEE77JsL4Wdw=
 github.com/foxcpp/libdns-gandi v1.2.2-0.20261105062312-a1407be551a8/go.mod h1:HAbs4cfjYUX28d25Iyn9rq4oNLoVLpJ6YSkRFLbo9IE=
 github.com/foxcpp/libdns-leaseweb v0.4.1-0.20261105063010-23a1ca46b0f6 h1:4FwRok7N4H+5Wx03fdojPGeBWkJNPeIaGx6dKR4fclE=
