@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS build-env
+FROM golang:1.26-alpine AS build-env
 
 ARG ADDITIONAL_BUILD_TAGS=""
 
@@ -22,7 +22,7 @@ LABEL org.opencontainers.image.source=https://github.com/foxcpp/maddy
 
 RUN set -ex && \
     apk upgrade --no-cache --available && \
-    apk --no-cache add ca-certificates
+    apk --no-cache add ca-certificates bash
 COPY --from=build-env /pkg/data/maddy.conf /data/maddy.conf
 COPY --from=build-env /pkg/usr/local/bin/maddy /bin/
 
