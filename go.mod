@@ -167,9 +167,10 @@ require (
 
 replace github.com/emersion/go-imap => github.com/foxcpp/go-imap v1.0.0-beta.1.0.20261105102928-3ab0436cfe5d
 
-// dioad/go-smtp is foxcpp/go-smtp's v0.25.1+maddy.1 base (emersion master
-// plus the exported Client.StartTLS) with ReverseProxyMode and ConnErrorHandler.
-replace github.com/emersion/go-smtp => github.com/dioad/go-smtp v0.24.1-0.20261106073926-66d84d4bc2a4
+// dioad/go-smtp v0.25.1-dioad.1 is upstream go-smtp master (the base of
+// foxcpp/go-smtp v0.25.1+maddy.1, including its exported Client.StartTLS)
+// plus ReverseProxyMode and ConnErrorHandler.
+replace github.com/emersion/go-smtp => github.com/dioad/go-smtp v0.25.1-dioad.1
 
 replace github.com/libdns/gandi => github.com/foxcpp/libdns-gandi v1.2.2-0.20261105062312-a1407be551a8 // v1.2.1+maddy.1
 
