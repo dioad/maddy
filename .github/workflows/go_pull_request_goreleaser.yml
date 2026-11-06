@@ -1,7 +1,12 @@
-name: Go Pull Request (goreleaser)
+name: Go (goreleaser)
 
+# Tests and a goreleaser snapshot build (nothing published) for pull requests
+# into the fork's main branch and for pushes to it. Releases are built from
+# v*-dioad.* tags by dioad-release.yml.
 on:
   pull_request:
+    branches: [ "feat/reverse-proxy-mode" ]
+  push:
     branches: [ "feat/reverse-proxy-mode" ]
 
 jobs:
